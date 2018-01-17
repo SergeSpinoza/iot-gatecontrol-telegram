@@ -8,12 +8,49 @@ import usocket as socket
 import ustruct as struct
 import webrepl
 
+
+# These defaults are overwritten with the contents of config.json by load_config()
+CONFIG = {
+    # Configuration details of the WiFi network
+    "WIFI_SSID": "network_ssid",
+    "WIFI_PASSWORD": "secret_pass",
+    # Configuration details of the MQTT broker
+    "MQTT_BROKER": "192.168.1.1",
+    "USER": "mqtt_user",
+    "PASSWORD": "mqtt_pass",
+    "PORT": 1883,
+    "PORT-SSL": 8883, # ssl port
+    "TOPIC": b"mqtt_topic",
+    # unique identifier of the chip
+    "CLIENT_ID": b"esp8266_" + ubinascii.hexlify(machine.unique_id())
+}
+
+def load_config():
+    import ujson as json
+    try:
+        with open("config.json") as f:
+            config = json.loads(f.read())
+    except (OSError, ValueError):
+        print("Couldn't load config.json")
+        save_config()
+    else:
+        CONFIG.update(config)
+        print("Loaded config from config.json")
+
+def save_config():
+    import ujson as json
+    try:
+        with open("config.json", "w") as f:
+            f.write(json.dumps(CONFIG))
+    except OSError:
+        print("Couldn't save config.json")
+
 def activate():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
         print('connecting to network...')
-        wlan.connect('wifi-ssid', 'password')
+        wlan.connect(CONFIG['WIFI_SSID'], CONFIG['WIFI_PASSWORD'])
         while not wlan.isconnected():
             pass
         print('network config:', wlan.ifconfig())
@@ -21,24 +58,21 @@ def activate():
     ap_if = network.WLAN(network.AP_IF)
     ap_if.active(False)
 
-activate()
-webrepl.start()
-
 # (date(2000, 1, 1) - date(1900, 1, 1)).days * 24*60*60
-NTP_DELTA = 3155673600
+ntp_delta = 3155673600
 host = "pool.ntp.org"
 
 def time_now():
-    NTP_QUERY = bytearray(48)
-    NTP_QUERY[0] = 0x1b
+    ntp_query = bytearray(48)
+    ntp_query[0] = 0x1b
     addr = socket.getaddrinfo(host, 123)[0][-1]
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(1)
-    res = s.sendto(NTP_QUERY, addr)
+    res = s.sendto(ntp_query, addr)
     msg = s.recv(48)
     s.close()
     val = struct.unpack("!I", msg[40:44])[0]
-    return val - NTP_DELTA
+    return val - ntp_delta
 
 # There's currently no timezone support in MicroPython, so
 # utime.localtime() will return UTC time (as if it was .gmtime())
@@ -49,6 +83,9 @@ def settime():
     machine.RTC().datetime(tm)
     # print(time.localtime())
 
+load_config()
+activate()
+webrepl.start()
 settime()
 
 # Setup a GPIO Pin for output
@@ -65,18 +102,6 @@ def internet_connected(host='8.8.8.8', port=53):
         return False
     finally:
         s.close()
-
-# Modify below section as required
-CONFIG = {
-    # Configuration details of the MQTT broker
-    "MQTT_BROKER": "host",
-    "USER": "mqtt_user",
-    "PASSWORD": "password",
-    "PORT": 16375,
-    "TOPIC": b"street/gate1", # or street/gate2 and street/garage, depending on which controller is configured
-    # unique identifier of the chip
-    "CLIENT_ID": b"esp8266_gate_" + ubinascii.hexlify(machine.unique_id())
-}
 
 # Method to act based on message received
 def onMessage(topic, msg):
