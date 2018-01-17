@@ -1,22 +1,13 @@
 import logging
-import paho.mqtt.client as mqttClient
+import paho.mqtt.client as mqttclient
 import struct
 import socket
-
 import json
-import os
-import sys
-import time
-import threading
-import datetime
-import requests
-
 from enum import Enum, auto
 from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, ParseMode
 from telegram.ext import Updater, CommandHandler, ConversationHandler, RegexHandler
 
 # Logging
-#logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler('command.log')
@@ -29,40 +20,25 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
-# MQTT Settings
-mqtt_broker = "host"
-user = "mqtt_user"
-password = "password"
-port = 16375
-port_ssl = 26375 # ssl port
-gate1_topic = "street/gate1"
-gate2_topic = "street/gate2"
-garage_topic = "street/garage"
-mqtt_client_id = "bot_name"
-mqtt_qos = 2
-mqtt_keepalive = 60
-mqtt_tls = True
+# Read configuration
+with open("config.json") as config_file:
+    config = json.load(config_file)
 
-### Telegram settings
-bot_token = 'telegram_bot_token'
-# Bot users list
-user_id_list = ('1111111111', '22222222222')
-#                 user1         user2
+user_id_list = tuple(config["user_id_list"])
 
-### NTP settings
+# NTP settings
 # (date(2000, 1, 1) - date(1900, 1, 1)).days * 24*60*60
-NTP_DELTA = 3155673600
+ntp_delta = 3155673600
 host = "pool.ntp.org"
 
-updater = Updater(token=bot_token)
+updater = Updater(token=config["bot_token"])
 dispatcher = updater.dispatcher
 job_queue = updater.job_queue
 
-### Write command to log
-def write_com_log (user_id, command, controller):
-    logging.info("User: " + str(user_id) + ", gave the command: " + command + " to controller: " + str(controller))
-#    file = open('kalachevobot.log', 'a+')
 
+# Write command to log
+def write_com_log(user_id, command, controller):
+    logging.info("User: " + str(user_id) + ", gave the command: " + command + " to controller: " + str(controller))
 
 
 ### MQTT ###
@@ -74,55 +50,56 @@ def on_connect(client, userdata, flags, rc):
         Connected = True  # Signal connection
     else:
         print("Connection failed")
+
 def on_message(client, userdata, message):
-    if str(message.payload).find("PONG") > -1 and message.topic == "street/gate1":
+    if str(message.payload).find("PONG") > -1 and message.topic == config["gate1_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Контроллер GATE 1 на связи.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
-    elif str(message.payload).find("PONG") > -1 and message.topic == "street/gate2":
+    elif str(message.payload).find("PONG") > -1 and message.topic == config["gate2_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Контроллер GATE 2 на связи.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
-    elif str(message.payload).find("PONG") > -1 and message.topic == "street/garage":
+    elif str(message.payload).find("PONG") > -1 and message.topic == config["garage_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Контроллер GARAGE на связи.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
-    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == "street/gate1":
+    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == config["gate1_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Gate 1: команда получена.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
-    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == "street/gate2":
+    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == config["gate2_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Gate 2: команда получена.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
-    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == "street/garage":
+    elif str(message.payload).find("SIGNALOK") > -1 and message.topic == config["garage_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
         t_message = "Garage ворота: команда получена.\n"
         if str_list[1]:
             updater.bot.send_message(str_list[1], t_message)
 
-
 Connected = False  # global variable for the state of the connection
-client = mqttClient.Client(mqtt_client_id)  # create new instance
-client.username_pw_set(user, password=password)  # set username and password
+client = mqttclient.Client(config["mqtt_client_id"])  # create new instance
+client.username_pw_set(config["mqtt_user"], password=config["mqtt_password"])  # set username and password
 client.on_connect = on_connect  # attach function to callback
 client.on_message = on_message  # attach function to callback
-if mqtt_tls == True:
+
+if config["mqtt_tls"]:
     client.tls_set("cacert.pem")
-    client.connect(mqtt_broker, port=port_ssl)  # connect to broker
+    client.connect(config["mqtt_broker"], port=config["port_ssl"])  # connect to broker
 else:
-    client.connect(mqtt_broker, port=port)  # connect to broker
+    client.connect(config["mqtt_broker"], port=config["port"])  # connect to broker
 client.subscribe("street/#")
 
 ### END MQTT ###
@@ -140,6 +117,7 @@ class WorkflowEnum(Enum):
     CTRLS_PING = auto()
     CTRLS_RESTART = auto()
 
+
 # Enum for keyboard
 class KeyboardEnum(Enum):
     GATE_1 = auto()
@@ -156,6 +134,7 @@ class KeyboardEnum(Enum):
     def clean(self):
         return self.name.replace("_", " ")
 
+
 # Time now in sec after 2000, 1, 1
 def time_now():
     NTP_QUERY = bytearray(48)
@@ -167,7 +146,7 @@ def time_now():
     msg = s.recv(48)
     s.close()
     val = struct.unpack("!I", msg[40:44])[0]
-    return val - NTP_DELTA
+    return val - ntp_delta
 
 # Return chat ID for an update object
 def get_chat_id(update=None):
@@ -190,7 +169,7 @@ def is_user_valid(bot, update):
             break
 #    if str(chat_id) != user_id:
     if found != 1:
-        bot.send_message(chat_id, text="Access denied")
+        bot.send_message(chat_id, text="Access denied for id: " + str(chat_id))
         logger.info("Access denied for user %s" % chat_id)
         return False
     else:
@@ -351,7 +330,7 @@ def gate1_open_confirm(bot, update):
     update.message.reply_text("Подаем команду на GATE 1", reply_markup=keyboard_cmds())
     # MQTT string
     msg_send = "SIGNAL-" + str(chat_id)
-    client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+    client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     # log info
     write_com_log(chat_id, msg_send, "GATE 1")
     #
@@ -365,7 +344,7 @@ def gate2_open_confirm(bot, update):
     update.message.reply_text("Подаем команду на GATE 2", reply_markup=keyboard_cmds())
     # MQTT string
     msg_send = "SIGNAL-" + str(chat_id)
-    client.publish(gate2_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+    client.publish(config["gate2_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     #
     # log info
     write_com_log(chat_id, msg_send, "GATE 2")
@@ -380,7 +359,7 @@ def garage_open_confirm(bot, update):
     update.message.reply_text("Подаем команду на GARAGE", reply_markup=keyboard_cmds())
     # MQTT string
     msg_send = "SIGNAL-" + str(chat_id)
-    client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+    client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     #
     # log info
     write_com_log(chat_id, msg_send, "GARAGE")
@@ -395,8 +374,8 @@ def gate1_garage_open_confirm(bot, update):
     update.message.reply_text("Подаем команду на GATE 1 и GARAGE", reply_markup=keyboard_cmds())
     # MQTT string
     msg_send = "SIGNAL-" + str(chat_id)
-    client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
-    client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+    client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
+    client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     #
     # log info
     write_com_log(chat_id, msg_send, "GATE 1 and GARAGE")
@@ -412,27 +391,27 @@ def ctrls_ping(bot, update):
         reply_msg = "Отправляю команду для проверки связи контроллера GATE 1...\n"
         update.message.reply_text(reply_msg)
         msg_send = "PING-" + str(chat_id)
-        client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.GATE_2.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду для проверки связи контроллера GATE 2...\n"
         update.message.reply_text(reply_msg)
         msg_send = "PING-" + str(chat_id)
-        client.publish(gate2_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate2_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.GARAGE.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду для проверки связи контроллера GARAGE...\n"
         update.message.reply_text(reply_msg)
         msg_send = "PING-" + str(chat_id)
-        client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.ALL.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду для проверки связи всем контроллерам...\n"
         update.message.reply_text(reply_msg)
         msg_send = "PING-" + str(chat_id)
-        client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
-        client.publish(gate2_topic, payload=msg_send, qos=mqtt_qos, retain=False)
-        client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
+        client.publish(config["gate2_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
+        client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.CANCEL.clean():
         return cancel(bot, update)
     return WorkflowEnum.CTRLS_PING
@@ -444,27 +423,27 @@ def ctrls_restart(bot, update):
         reply_msg = "Отправляю команду на перезагрузку контроллера GATE 1...\n"
         update.message.reply_text(reply_msg, reply_markup=keyboard_cmds())
         msg_send = "RESET"
-        client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.GATE_2.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду на перезагрузку контроллера GATE 2...\n"
         update.message.reply_text(reply_msg, reply_markup=keyboard_cmds())
         msg_send = "RESET"
-        client.publish(gate2_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate2_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.GARAGE.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду на перезагрузку контроллера GARAGE...\n"
         update.message.reply_text(reply_msg, reply_markup=keyboard_cmds())
         msg_send = "RESET"
-        client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.ALL.clean():
         chat_id = get_chat_id(update)
         reply_msg = "Отправляю команду на перезагрузку всех контроллеров...\n"
         update.message.reply_text(reply_msg, reply_markup=keyboard_cmds())
         msg_send = "RESET"
-        client.publish(gate1_topic, payload=msg_send, qos=mqtt_qos, retain=False)
-        client.publish(gate2_topic, payload=msg_send, qos=mqtt_qos, retain=False)
-        client.publish(garage_topic, payload=msg_send, qos=mqtt_qos, retain=False)
+        client.publish(config["gate1_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
+        client.publish(config["gate2_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
+        client.publish(config["garage_topic"], payload=msg_send, qos=config["mqtt_qos"], retain=False)
     elif update.message.text == KeyboardEnum.CANCEL.clean():
         return cancel(bot, update)
     return ConversationHandler.END
