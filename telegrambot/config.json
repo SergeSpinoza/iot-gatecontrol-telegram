@@ -1,0 +1,17 @@
+{
+    "mqtt_broker" : "192.168.1.1",
+    "mqtt_user" : "login",
+    "mqtt_password" : "password",
+    "port" : 1883,
+    "port_ssl" : 8883,
+    "gate1_topic" : "topic1",
+    "gate2_topic" : "topic2",
+    "garage_topic" : "topic3",
+    "mqtt_client_id" : "client_id",
+    "mqtt_qos" : 2,
+    "mqtt_keepalive" : 60,
+    "mqtt_tls" : true,
+    "bot_token" : "telegram bot token",
+    "user_id_list" : [ "111111111", "222222222", "333333333" ],
+    "_comment": "        user1        user2       user3"
+}
