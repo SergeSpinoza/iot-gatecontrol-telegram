@@ -50,8 +50,10 @@ def on_connect(client, userdata, flags, rc):
         Connected = True  # Signal connection
     else:
         print("Connection failed")
+    client.subscribe("street/#")
 
 def on_message(client, userdata, message):
+    logging.debug("MQTT topic: " + str(message.topic) + ", message: " + str(message.payload))
     if str(message.payload).find("PONG") > -1 and message.topic == config["gate1_topic"]:
         str_full = str(message.payload).replace('b', '').replace('\'', '').replace('\"', '')
         str_list = str_full.split('-', maxsplit=1)
@@ -100,7 +102,6 @@ if config["mqtt_tls"]:
     client.connect(config["mqtt_broker"], port=config["port_ssl"])  # connect to broker
 else:
     client.connect(config["mqtt_broker"], port=config["port"])  # connect to broker
-client.subscribe("street/#")
 
 ### END MQTT ###
 
@@ -509,7 +510,6 @@ for user_id in user_id_list:
         updater.bot.send_message(user_id, message, reply_markup=keyboard_cmds())
     except:
         continue
-
 
 ### Start MQTT ###
 try:
