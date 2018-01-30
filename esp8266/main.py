@@ -1,5 +1,6 @@
 from umqtt.robust import MQTTClient
 from machine import Pin
+from machine import Timer
 import network
 import machine
 import ubinascii
@@ -7,7 +8,19 @@ import utime as time
 import usocket as socket
 import ustruct as struct
 import webrepl
+import urandom
 
+global i
+global echo_msg_req
+global echo_msg_ans
+global echo_fails
+echo_msg_req = "EMPTY"
+echo_msg_ans = "EMPTY"
+echo_fails = 0
+tim_1 = Timer(-1)
+i = 2
+# Setup a GPIO Pin for output
+bulbPin = Pin(4, Pin.OUT)
 
 # These defaults are overwritten with the contents of config.json by load_config()
 CONFIG = {
@@ -24,6 +37,7 @@ CONFIG = {
     # unique identifier of the chip
     "CLIENT_ID": b"esp8266_" + ubinascii.hexlify(machine.unique_id())
 }
+
 
 def load_config():
     import ujson as json
@@ -86,10 +100,12 @@ def settime():
 load_config()
 activate()
 webrepl.start()
-settime()
-
-# Setup a GPIO Pin for output
-bulbPin = Pin(4, Pin.OUT)
+try:
+    settime()
+except OSError as e:
+    print(e)
+    time.sleep(60)
+    machine.reset()
 
 # Check Internet connection
 def internet_connected(host='8.8.8.8', port=53):
@@ -125,34 +141,71 @@ def onMessage(topic, msg):
             client.publish(CONFIG['TOPIC'], send_msg)
     elif msg == b"RESET":
         machine.reset()
+    elif str(msg).find("ECHO-") > -1:
+        global echo_msg_ans
+        msg = str(msg)
+        echo_msg_ans = msg.replace('b', '').replace('\'', '').replace("\"", "")
+        # print("ECHO msg ans: " + echo_msg_ans)
 
 def mqtt_reconnect():
     # Create an instance of MQTTClient
     global client
+    global i
+    global echo_fails
+    i = 1
     client = MQTTClient(CONFIG['CLIENT_ID'], CONFIG['MQTT_BROKER'], user=CONFIG['USER'], password=CONFIG['PASSWORD'], port=CONFIG['PORT'])
     # Attach call back handler to be called on receiving messages
     client.DEBUG = True
     client.set_callback(onMessage)
-    client.connect(clean_session=True)
-    client.subscribe(CONFIG['TOPIC'])
-    print("ESP8266 is Connected to %s and subscribed to %s topic" % (CONFIG['MQTT_BROKER'], CONFIG['TOPIC']))
+    try:
+        client.connect(clean_session=True)
+        client.subscribe(CONFIG['TOPIC'])
+        print("ESP8266 is Connected to %s and subscribed to %s topic" % (CONFIG['MQTT_BROKER'], CONFIG['TOPIC']))
+        i = 0
+        echo_fails = 0
+    except:
+        i = 1
 
-i = 2
+def mqtt_check_conn():
+    global echo_msg_ans
+    global echo_msg_req
+    global echo_fails
+    global i
+    # print("I in func is: " + str(i))
+    if i == 0:
+        if echo_msg_req != echo_msg_ans:
+            echo_fails = 1
+            # print("ECHO fails: " + str(echo_fails))
+        else:
+            echo_fails = 0
+            # print("Echo_fails: " + str(echo_fails))
+        rand = urandom.getrandbits(30)
+        echo_msg_req = "ECHO-" + str(rand)
+        client.publish(CONFIG['TOPIC'], echo_msg_req)
+        # print("ECHO msg req: " + echo_msg_req)
+
+tim_1.init(period=10000, mode=Timer.PERIODIC, callback=lambda t: mqtt_check_conn())
+
+
 try:
     while True:
         ping_test = internet_connected()
-        if ping_test and i == 0:
+        if (ping_test and i == 0) and echo_fails == 0:
             # Check topic
             client.check_msg()
         elif ping_test and i == 1:
-            # New session
+            # New session, and if Internet is ok but MQTT server not answer
             mqtt_reconnect()
-            client.check_msg()
-            i = 0
-        elif ping_test == False and i == 0:
+            if i == 0:
+                client.check_msg()
+        elif (ping_test == False and i == 0) or echo_fails == 1:
             # Disconnect
+            echo_msg_ans = echo_msg_req
+            if i == 0:
+                client.disconnect()
+                # print("Client Disconnect")
             i = 1
-            client.disconnect()
+            # print("Client Disconnected")
         elif ping_test and i == 2:
             # First connection
             mqtt_reconnect()
@@ -162,12 +215,11 @@ try:
             pass
         time.sleep(0.5)
         continue
+except KeyboardInterrupt:
+    tim_1.deinit()
 except OSError as e:
     print(e)
     time.sleep(60)
     machine.reset()
 
 client.disconnect()
-
-
-
