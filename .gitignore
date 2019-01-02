@@ -1,0 +1,4 @@
+# Exclude folder and files
+.idea
+.DS_Store
+config.py

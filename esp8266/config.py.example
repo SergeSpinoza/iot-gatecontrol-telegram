@@ -1,0 +1,18 @@
+CONFIG = {
+    # Configuration details of the WiFi network
+    "WIFI_SSID": "test",
+    "WIFI_PASSWORD": "12345678",
+    # Configuration details of the MQTT broker
+    "MQTT_BROKER": "mqtt.com",
+    "USER": "user1",
+    "PASSWORD": "pass_user1",
+    "PORT": 16375,
+    "PORT-SSL": 26375, # ssl port
+    "TOPIC": b"street/garage",
+    # unique identifier of the chip
+    "CLIENT_ID": b"esp8266_garage_0001",
+    "MQTT_MAX_ERR": 5,
+    "MQTT_CRIT_ERR": 10,
+    "INT_MAX_ERR": 20,
+    "INT_CRIT_ERR": 50
+}
