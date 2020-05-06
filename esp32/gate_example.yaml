@@ -1,0 +1,87 @@
+esphome:
+  name: gate_garage_01
+  platform: ESP32
+  board: nodemcu-32s
+
+wifi:
+  ssid: "wifi_ssid"
+  password: "wifi_password"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+#   ap:
+#     ssid: "Gate Garage 01 Fallback Hotspot"
+#     password: "ap_password"
+
+captive_portal:
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+# api:
+#   password: "api_password"
+
+ota:
+  password: "ota_password"
+
+switch:
+  - platform: gpio
+    pin: 19
+    name: "Garage Door Switch"
+    id: gate_switch
+    restore_mode: ALWAYS_OFF
+
+
+globals:
+  - id: telegram_id
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+mqtt:
+  broker: mqtt_server_url
+  username: mqtt_username
+  password: mqtt_password
+  port: 16375
+  reboot_timeout: 30s
+  discovery: False
+  log_topic: street/garage/log
+  id: gate_garage_01
+
+  birth_message:
+    topic: street/garage/status
+    payload: online
+  will_message:
+    topic: street/garage/status
+    payload: offline
+
+  on_json_message:
+    topic: street/garage
+    then:
+      - lambda: |-
+          if (x.containsKey("command")) {
+            if (x["command"]=="SIGNAL") {
+              id(gate_switch).turn_on();
+              id(telegram_id)=x["userid"];
+              delay(500);
+              id(gate_switch).turn_off();
+
+              StaticJsonBuffer<128> jsonBuffer;
+              JsonObject& root = jsonBuffer.createObject();
+              root["command"] = "OPEN";
+              root["userid"] = x["userid"];
+              char output[128];
+              root.printTo(output);                        
+              id(gate_garage_01).publish("street/garage", output);
+            }
+            else if (x["command"]=="PING") {
+              StaticJsonBuffer<128> jsonBuffer;
+              JsonObject& root = jsonBuffer.createObject();
+              root["command"] = "PONG";
+              root["userid"] = x["userid"];
+              char output[128];
+              root.printTo(output);                        
+              id(gate_garage_01).publish("street/garage", output);
+            }
+          }
+

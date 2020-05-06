@@ -1,0 +1,12 @@
+version: '3.1'
+
+services:
+
+    tlgkalachevobot:
+        build:
+          context: ./
+          dockerfile: Dockerfile
+        image: tlgkalachevobot
+        container_name: telegram-kalachevo-bot
+        restart: always
+

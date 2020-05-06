@@ -11,6 +11,10 @@
     "mqtt_qos" : 2,
     "mqtt_keepalive" : 60,
     "mqtt_tls" : true,
+    "telegram_proxy": true,
+    "telegram_proxy_url": "socks5h://soc-server.org:1080",
+    "telegram_proxy_username": "telegram",
+    "telegram_proxy_password": "password",
     "bot_token" : "telegram bot token",
     "user_id_list" : [ "111111111", "222222222", "333333333" ],
     "_comment": "        user1        user2       user3"

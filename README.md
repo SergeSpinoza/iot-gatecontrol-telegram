@@ -1,6 +1,7 @@
 # iot-gatecontrol-telegram
 
-This repository contains 2 directories:
+This repository contains 3 directories:
+- esp32 - code on ESPHome for micro controllers ESP32
 - esp8266 - code on MicroPython for micro controllers NodeMCU (esp8266)
 - telegrambot - code on Python. It's telegram bot for control micro controllers via MQTT protocol.
 
