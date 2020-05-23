@@ -7,8 +7,10 @@ config.json
 .esphome
 esp32/gate_garage
 esp32/gate_gate1_01
+esp32/gate_gate2_01
 esp32/gate_garage.yaml
 esp32/gate_gate1.yaml
+esp32/gate_gate2.yaml
 __pycache__
 telegrambot/command.log
 telegrambot/cacert.pem
