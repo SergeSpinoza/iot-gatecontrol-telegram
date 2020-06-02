@@ -5,7 +5,7 @@ config.py
 config-test.json
 config.json
 .esphome
-esp32/gate_garage
+esp32/gate_garage_01
 esp32/gate_gate1_01
 esp32/gate_gate2_01
 esp32/gate_garage.yaml
